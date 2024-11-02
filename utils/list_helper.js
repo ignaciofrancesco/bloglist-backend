@@ -165,8 +165,6 @@ const oneBlog = [
   },
 ];
 
-console.log(mostLikes(oneBlog));
-
 module.exports = {
   dummy,
   totalLikes,
