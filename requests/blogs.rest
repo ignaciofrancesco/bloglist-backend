@@ -2,8 +2,20 @@ POST http://localhost:3003/api/blogs
 Content-Type: application/json
 
 {
-  "title": "Live to the fullest.",
-  "author": "Angel",
-  "url": "https://viviralmaximo.net",
-  "likes": 7
+  "title": "Charlkies angels.",
+  "author": "Maxime",
+  "url": "https://charlies.net",
+  "likes": 2
+}
+
+### Delete one blog
+DELETE http://localhost:3003/api/blogs/6727a37b1695523c2f96cf90
+
+### Update a blog by id
+PUT http://localhost:3003/api/blogs/6727fde93c0b798af73a13d1
+Content-Type: application/json
+
+{
+  "title": "UPdated title.",
+  "likes": 27
 }

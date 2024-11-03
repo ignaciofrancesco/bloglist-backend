@@ -1,7 +1,12 @@
 const { describe, test, after, beforeEach } = require("node:test");
 const assert = require("node:assert");
 const supertest = require("supertest");
-const { initialBlogs, blogNotInDb, blogsInDb } = require("./test_helper");
+const {
+  initialBlogs,
+  blogNotInDb,
+  blogsInDb,
+  nonExistingId,
+} = require("./test_helper");
 const mongoose = require("mongoose");
 const { ObjectId } = mongoose.Types;
 const Blog = require("../models/blog");
@@ -98,6 +103,10 @@ describe("The blog api", () => {
       .post("/api/blogs/")
       .send(blogWithoutTitle)
       .expect(400);
+
+    const blogsAfter = await blogsInDb();
+
+    assert.strictEqual(initialBlogs.length, blogsAfter.length);
   });
 
   test("if url is missing in the request, backend responds with 400 bad request.", async () => {
@@ -110,9 +119,88 @@ describe("The blog api", () => {
       .post("/api/blogs/")
       .send(blogWithoutUrl)
       .expect(400);
+
+    const blogsAfter = await blogsInDb();
+
+    assert.strictEqual(initialBlogs.length, blogsAfter.length);
+  });
+
+  describe("when deleting", () => {
+    test("succeds with valid id", async () => {
+      // Arrange
+      const blogsBefore = await blogsInDb();
+      const blogToDelete = blogsBefore[0];
+
+      // Act
+      const result = await api
+        .delete(`/api/blogs/${blogToDelete.id}`)
+        .expect(204);
+
+      const blogsAfter = await blogsInDb();
+      const blogsAfterIds = blogsAfter.map((b) => {
+        return b.id;
+      });
+
+      // Assert
+      // The size of the list is decreased by 1
+      assert.strictEqual(blogsAfter.length, blogsBefore.length - 1);
+      // The list doesnt contain the deleted blog
+      assert.strictEqual(blogsAfterIds.includes(blogToDelete.id), false);
+    });
+
+    test("rejects with 400 when id is invalid", async () => {
+      // Arrange
+      const invalidId = "xxxxx";
+      // Act && assert
+      await api
+        .delete(`/api/blogs/${invalidId}`)
+        .expect(400)
+        .expect("Content-Type", /application\/json/);
+    });
+  });
+
+  describe("when updating", () => {
+    test("succeeds with valid id", async () => {
+      // Arrange
+      const blogsBefore = await blogsInDb();
+      const blogToUpdate = blogsBefore[0];
+      blogToUpdate.likes++;
+
+      // Act
+      const response = await api
+        .put(`/api/blogs/${blogToUpdate.id}`)
+        .send(blogToUpdate)
+        .expect(200)
+        .expect("Content-Type", /application\/json/);
+
+      const updatedBlog = response.body;
+
+      const blogsAfter = await blogsInDb();
+
+      // Assert
+      // The size of the list doesn't change
+      assert.strictEqual(blogsAfter.length, blogsBefore.length);
+      // the updated blog contains the updated values
+      assert.deepStrictEqual(updatedBlog, {
+        ...blogToUpdate,
+        likes: blogToUpdate.likes++,
+      });
+    });
+
+    test("rejects with status code 404 if not found", async () => {
+      // Arrange
+      const id = await nonExistingId();
+
+      // Act
+      const reponse = await api
+        .put(`/api/blogs/${id}`)
+        .send({ title: "just text" })
+        .expect(404);
+    });
   });
 });
 
 after(async () => {
+  console.log("Closing database connection...");
   await mongoose.connection.close();
 });

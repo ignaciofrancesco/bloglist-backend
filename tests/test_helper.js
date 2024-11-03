@@ -46,15 +46,17 @@ const blogNotInDb = {
   likes: 2,
 };
 
-/* const nonExistingId = async () => {
-  const note = new Note({ content: "willremovethissoon" });
-  await note.save();
-  await note.deleteOne();
-}; */
+const nonExistingId = async () => {
+  const blog = new Blog({ title: "willremovethissoon" });
+  await blog.save();
+  await blog.deleteOne();
+
+  return blog._id.toString();
+};
 
 const blogsInDb = async () => {
   const blogs = await Blog.find({});
   return blogs.map((blog) => blog.toJSON()); // this tojson converts mongoose objects to js objects
 };
 
-module.exports = { initialBlogs, blogsInDb, blogNotInDb };
+module.exports = { initialBlogs, blogsInDb, blogNotInDb, nonExistingId };
