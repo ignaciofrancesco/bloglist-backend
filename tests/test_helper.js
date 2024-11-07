@@ -1,4 +1,5 @@
 const Blog = require("../models/blog");
+const User = require("../models/user");
 
 const initialBlogs = [
   {
@@ -59,4 +60,15 @@ const blogsInDb = async () => {
   return blogs.map((blog) => blog.toJSON()); // this tojson converts mongoose objects to js objects
 };
 
-module.exports = { initialBlogs, blogsInDb, blogNotInDb, nonExistingId };
+const usersInDb = async () => {
+  const users = await User.find({});
+  return users.map((user) => user.toJSON()); // this tojson converts mongoose objects to js objects
+};
+
+module.exports = {
+  initialBlogs,
+  blogsInDb,
+  blogNotInDb,
+  nonExistingId,
+  usersInDb,
+};
