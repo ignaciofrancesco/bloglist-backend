@@ -80,14 +80,30 @@ blogsRouter.put("/:id", async (request, response) => {
 // Delete a blog by id
 blogsRouter.delete("/:id", async (request, response) => {
   // Get data from the request
-  const id = request.params.id;
+  const blogId = request.params.id;
+  const token = request.token;
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  // Decode the token
+  const decodedToken = jwt.verify(token, process.env.SECRET);
+
+  if (!mongoose.Types.ObjectId.isValid(blogId)) {
     return response.status(400).json({ error: "Bad request: invalid id" });
   }
 
-  // Process data
-  const result = await Blog.findByIdAndDelete(id);
+  if (!decodedToken.id) {
+    return response.status(401).json({ error: "Unauthorized: Invalid token." });
+  }
+
+  // Find the blog
+  const blog = await Blog.findById(blogId);
+
+  if (blog.user.toString() !== decodedToken.id) {
+    return response
+      .status(401)
+      .json({ error: "Unauthorized: cannot delete a blog that is not yours." });
+  }
+
+  const result = await blog.deleteOne();
 
   // Return response
   return response.status(204).end();
