@@ -1,11 +1,13 @@
+### Create a new blog with authentication
 POST http://localhost:3003/api/blogs
 Content-Type: application/json
+Authorization: bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InJvb3QiLCJpZCI6IjY3MmMwZDdhMjM3MGQ2MzY0NTcxNDE3ZCIsImlhdCI6MTczMTE5MTQ3N30.Qn4nP0rNXWmCC3BT0ZUfOs2HE_DgQGEqyeqEq1IjNb8
 
 {
-  "title": "Charlkies angels.",
-  "author": "Maxime",
-  "url": "https://charlies.net",
-  "likes": 2
+  "title": "the new way 2.",
+  "author": "ignacio",
+  "url": "https://ignacio.net",
+  "likes": 13
 }
 
 ### Delete one blog
