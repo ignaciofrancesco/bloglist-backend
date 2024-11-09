@@ -18,8 +18,6 @@ loginRouter.post("/", async (request, response) => {
     return response.status(404).json({ error: "Username not found." });
   }
 
-  console.log(password, user);
-
   const passwordCorrect = await bcrypt.compare(password, user.passwordHash);
 
   if (!passwordCorrect) {

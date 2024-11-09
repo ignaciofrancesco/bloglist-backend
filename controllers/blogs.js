@@ -4,15 +4,6 @@ const Blog = require("../models/blog");
 const User = require("../models/user");
 const jwt = require("jsonwebtoken");
 
-// Isolate token from Authorization header
-const getTokenFrom = (request) => {
-  const authorization = request.get("authorization");
-  if (authorization && /^Bearer /i.test(authorization)) {
-    return authorization.split(/^Bearer /i)[1];
-  }
-  return null;
-};
-
 // Get all blogs
 blogsRouter.get("/", async (request, response) => {
   const blogs = await Blog.find({}).populate("user", {
@@ -26,9 +17,7 @@ blogsRouter.get("/", async (request, response) => {
 // Add a new blog
 blogsRouter.post("/", async (request, response) => {
   let blog = request.body;
-
-  // Get token from Authorization header and decode
-  const token = getTokenFrom(request);
+  const token = request.token;
 
   const decodedToken = jwt.verify(token, process.env.SECRET);
 

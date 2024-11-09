@@ -13,7 +13,8 @@ const app = express();
 // DB connection
 mongoose.connect(MONGODB_URI);
 
-// Middleware 2
+// Middleware 1
+app.use(middleware.tokenExtractor);
 app.use(cors());
 app.use(express.json());
 

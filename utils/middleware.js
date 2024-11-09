@@ -27,7 +27,20 @@ const errorHandler = (error, request, response, next) => {
   next(error);
 };
 
+/*  Isolates token from Authorization header */
+const tokenExtractor = (request, response, next) => {
+  const authorization = request.get("authorization");
+
+  if (authorization && /^Bearer /i.test(authorization)) {
+    request.token = authorization.replace(/^Bearer /i, "");
+  } else {
+    request.token = null;
+  }
+  next();
+};
+
 module.exports = {
   unknownEndpoint,
   errorHandler,
+  tokenExtractor,
 };
