@@ -17,14 +17,7 @@ blogsRouter.get("/", async (request, response) => {
 // Add a new blog
 blogsRouter.post("/", async (request, response) => {
   let blog = request.body;
-  const token = request.token;
-
-  const decodedToken = jwt.verify(token, process.env.SECRET);
-
-  // Check if the decoded token contains an id property, as it should
-  if (!decodedToken.id) {
-    return response.status(401).json({ error: "Invalid token" });
-  }
+  const user = request.user;
 
   if (!blog.title || !blog.url) {
     return response.status(400).end();
@@ -35,9 +28,6 @@ blogsRouter.post("/", async (request, response) => {
   }
 
   // If everything is valid, then create blog
-
-  // Get user from database
-  const user = await User.findById(decodedToken.id);
 
   // Assign user id to blog
   blog.user = user.id;
@@ -70,7 +60,7 @@ blogsRouter.put("/:id", async (request, response) => {
   const updatedBlog = await Blog.findByIdAndUpdate(blogId, blog, { new: true });
 
   if (!updatedBlog) {
-    return response.status(404).json({ error: "Object not found." });
+    return response.status(404).json({ error: "Not found: Object not found." });
   }
 
   // Send response
@@ -81,23 +71,16 @@ blogsRouter.put("/:id", async (request, response) => {
 blogsRouter.delete("/:id", async (request, response) => {
   // Get data from the request
   const blogId = request.params.id;
-  const token = request.token;
-
-  // Decode the token
-  const decodedToken = jwt.verify(token, process.env.SECRET);
+  const user = request.user;
 
   if (!mongoose.Types.ObjectId.isValid(blogId)) {
     return response.status(400).json({ error: "Bad request: invalid id" });
   }
 
-  if (!decodedToken.id) {
-    return response.status(401).json({ error: "Unauthorized: Invalid token." });
-  }
-
   // Find the blog
   const blog = await Blog.findById(blogId);
 
-  if (blog.user.toString() !== decodedToken.id) {
+  if (blog.user.toString() !== user.id.toString()) {
     return response
       .status(401)
       .json({ error: "Unauthorized: cannot delete a blog that is not yours." });
