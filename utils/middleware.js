@@ -6,8 +6,6 @@ const unknownEndpoint = (request, response) => {
 };
 
 const errorHandler = (error, request, response, next) => {
-  console.log(error.message);
-
   if (error.name === "CastError") {
     return response.status(400).send({ error: "malformatted id" });
   } else if (error.name === "ValidationError") {
@@ -45,18 +43,21 @@ const tokenExtractor = (request, response, next) => {
 const userExtractor = async (request, response, next) => {
   const token = request.token;
 
+  // Token missing
   if (!token) {
     return response.status(401).json({ error: "Unauthorized: Token missing" });
   }
 
   const decodedToken = jwt.verify(token, process.env.SECRET);
 
+  // Token invalid
   if (!decodedToken.id) {
     return response.status(401).json({ error: "Unauthorized: Invalid token" });
   }
 
   const user = await User.findById(decodedToken.id);
 
+  // User not found
   if (!user) {
     return response.status(404).json({ error: "Unauthorized: User not found" });
   }

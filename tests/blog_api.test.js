@@ -9,27 +9,55 @@ const {
 } = require("./test_helper");
 const mongoose = require("mongoose");
 const { ObjectId } = mongoose.Types;
+const User = require("../models/user");
 const Blog = require("../models/blog");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 const app = require("../app");
 
 // Wrap up the app with supertest
 const api = supertest(app);
 
+// Helper function to get auth token
+const getAuthToken = async () => {
+  const response = await api
+    .post("/api/login/")
+    .send({ username: "root", password: "newinset" });
+  return response.body.token;
+};
+
 beforeEach(async () => {
   // Clear the DB
-  console.log("Clearing database...");
+  console.log("Clearing DB...");
   await Blog.deleteMany({});
+  await User.deleteMany({});
 
-  console.log("Populating database...");
-  // Save the initial blogs
-  for (let blog of initialBlogs) {
-    let blogObject = new Blog(blog);
-    // This will wait for the operation, and just then it will go on
-    await blogObject.save();
-  }
+  // Create root user
+  console.log("Creating root user...");
+  const passwordHash = await bcrypt.hash("newinset", 10);
+  const user = {
+    username: "root",
+    passwordHash,
+    name: "rootName",
+  };
+  const userObject = new User(user);
+  const savedUser = await userObject.save();
+
+  const blogObjects = initialBlogs.map((blog) => ({
+    ...blog,
+    user: savedUser.id,
+  }));
+  const savedBlogs = await Blog.insertMany(blogObjects);
+
+  const blogIds = savedBlogs.map((blog) => blog._id);
+  await User.findByIdAndUpdate(
+    savedUser.id,
+    { blogs: blogIds },
+    { new: true, runValidators: true }
+  );
 });
 
-describe("The blog api", () => {
+describe("GET /api/blogs/", () => {
   test("all blogs are returned as json", async () => {
     const response = await api
       .get("/api/blogs/")
@@ -52,155 +80,136 @@ describe("The blog api", () => {
       assert.strictEqual(blogsFound.length, 1);
     }
   });
+});
 
-  test("POST request creates a new blog post.", async () => {
-    // Prepare
+describe("POST /api/blogs/", () => {
+  let token;
+
+  beforeEach(async () => {
+    token = await getAuthToken();
+  });
+
+  test("creates new blog post with valid data", async () => {
     const blogsBefore = await blogsInDb();
 
-    // Test
-    response = await api
+    const response = await api
       .post("/api/blogs/")
+      .auth(token, { type: "bearer" })
       .send(blogNotInDb)
       .expect(201)
       .expect("Content-Type", /application\/json/);
 
     const blogsAfter = await blogsInDb();
-
-    // Assert
     assert.strictEqual(blogsAfter.length, blogsBefore.length + 1);
-    let savedBlog = response.body;
-    delete savedBlog.id;
 
+    const savedBlog = { ...response.body };
+    delete savedBlog.id;
+    delete savedBlog.user;
     assert.deepStrictEqual(savedBlog, blogNotInDb);
   });
 
-  test("if likes property is missing in the request, it defaults to value 0.", async () => {
-    // Arrange
-    let blogWithoutLikesProperty = blogNotInDb;
-    delete blogWithoutLikesProperty.likes;
+  test("defaults missing likes to 0", async () => {
+    const blogWithoutLikes = { ...blogNotInDb };
+    delete blogWithoutLikes.likes;
 
-    // Act
-    response = await api
+    const response = await api
       .post("/api/blogs/")
-      .send(blogWithoutLikesProperty)
-      .expect(201)
-      .expect("Content-Type", /application\/json/);
+      .auth(token, { type: "bearer" })
+      .send(blogWithoutLikes)
+      .expect(201);
 
-    const savedBlog = response.body;
-
-    // Assert
-    assert.strictEqual(!blogWithoutLikesProperty.hasOwnProperty("likes"), true);
-    assert.strictEqual(savedBlog.likes, 0);
+    assert.strictEqual(response.body.likes, 0);
   });
 
-  test("if title is missing in the request, backend responds with 400 bad request.", async () => {
-    // Arrange
-    let blogWithoutTitle = { ...blogNotInDb };
+  test("rejects blog without title", async () => {
+    const blogWithoutTitle = { ...blogNotInDb };
     delete blogWithoutTitle.title;
 
-    // Act && Assert
-    responseTitle = await api
+    await api
       .post("/api/blogs/")
+      .auth(token, { type: "bearer" })
       .send(blogWithoutTitle)
       .expect(400);
 
     const blogsAfter = await blogsInDb();
-
-    assert.strictEqual(initialBlogs.length, blogsAfter.length);
+    assert.strictEqual(blogsAfter.length, initialBlogs.length);
   });
 
-  test("if url is missing in the request, backend responds with 400 bad request.", async () => {
-    // Arrange
-    let blogWithoutUrl = { ...blogNotInDb };
+  test("rejects blog without url", async () => {
+    const blogWithoutUrl = { ...blogNotInDb };
     delete blogWithoutUrl.url;
 
-    // Act && Assert
-    responseUrl = await api
+    await api
       .post("/api/blogs/")
+      .auth(token, { type: "bearer" })
       .send(blogWithoutUrl)
       .expect(400);
 
     const blogsAfter = await blogsInDb();
+    assert.strictEqual(blogsAfter.length, initialBlogs.length);
+  });
+});
 
-    assert.strictEqual(initialBlogs.length, blogsAfter.length);
+describe("DELETE /api/blogs/", () => {
+  let token;
+
+  beforeEach(async () => {
+    token = await getAuthToken();
   });
 
-  describe("when deleting", () => {
-    test("succeds with valid id", async () => {
-      // Arrange
-      const blogsBefore = await blogsInDb();
-      const blogToDelete = blogsBefore[0];
+  test("succeeds with valid id", async () => {
+    const blogsBefore = await blogsInDb();
+    const blogToDelete = blogsBefore[0];
 
-      // Act
-      const result = await api
-        .delete(`/api/blogs/${blogToDelete.id}`)
-        .expect(204);
+    await api
+      .delete(`/api/blogs/${blogToDelete.id}`)
+      .auth(token, { type: "bearer" })
+      .expect(204);
 
-      const blogsAfter = await blogsInDb();
-      const blogsAfterIds = blogsAfter.map((b) => {
-        return b.id;
-      });
-
-      // Assert
-      // The size of the list is decreased by 1
-      assert.strictEqual(blogsAfter.length, blogsBefore.length - 1);
-      // The list doesnt contain the deleted blog
-      assert.strictEqual(blogsAfterIds.includes(blogToDelete.id), false);
-    });
-
-    test("rejects with 400 when id is invalid", async () => {
-      // Arrange
-      const invalidId = "xxxxx";
-      // Act && assert
-      await api
-        .delete(`/api/blogs/${invalidId}`)
-        .expect(400)
-        .expect("Content-Type", /application\/json/);
-    });
+    const blogsAfter = await blogsInDb();
+    assert.strictEqual(blogsAfter.length, blogsBefore.length - 1);
+    assert(!blogsAfter.map((b) => b.id).includes(blogToDelete.id));
   });
 
-  describe("when updating", () => {
-    test("succeeds with valid id", async () => {
-      // Arrange
-      const blogsBefore = await blogsInDb();
-      const blogToUpdate = blogsBefore[0];
-      blogToUpdate.likes++;
+  test("rejects invalid id", async () => {
+    await api
+      .delete("/api/blogs/invalid-id")
+      .auth(token, { type: "bearer" })
+      .expect(400)
+      .expect("Content-Type", /application\/json/);
+  });
+});
 
-      // Act
-      const response = await api
-        .put(`/api/blogs/${blogToUpdate.id}`)
-        .send(blogToUpdate)
-        .expect(200)
-        .expect("Content-Type", /application\/json/);
+describe("PUT /api/blogs/", () => {
+  test("succeeds updating likes", async () => {
+    const blogsBefore = await blogsInDb();
+    const blogToUpdate = { ...blogsBefore[0] };
+    blogToUpdate.likes++;
 
-      const updatedBlog = response.body;
+    const response = await api
+      .put(`/api/blogs/${blogToUpdate.id}`)
+      .send(blogToUpdate)
+      .expect(200)
+      .expect("Content-Type", /application\/json/);
 
-      const blogsAfter = await blogsInDb();
+    const expectedBlog = {
+      ...blogToUpdate,
+      user: blogToUpdate.user.toString(),
+    };
+    assert.deepStrictEqual(response.body, expectedBlog);
 
-      // Assert
-      // The size of the list doesn't change
-      assert.strictEqual(blogsAfter.length, blogsBefore.length);
-      // the updated blog contains the updated values
-      assert.deepStrictEqual(updatedBlog, {
-        ...blogToUpdate,
-        likes: blogToUpdate.likes++,
-      });
-    });
+    const blogsAfter = await blogsInDb();
+    assert.strictEqual(blogsAfter.length, blogsBefore.length);
+  });
 
-    test("rejects with status code 404 if not found", async () => {
-      // Arrange
-      const id = await nonExistingId();
-
-      // Act
-      const reponse = await api
-        .put(`/api/blogs/${id}`)
-        .send({ title: "just text" })
-        .expect(404);
-    });
+  test("rejects nonexistent id", async () => {
+    const id = await nonExistingId();
+    await api.put(`/api/blogs/${id}`).send({ title: "just text" }).expect(404);
   });
 });
 
 after(async () => {
   console.log("Closing database connection...");
   await mongoose.connection.close();
+  await mongoose.disconnect();
 });

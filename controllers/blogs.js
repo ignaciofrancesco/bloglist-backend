@@ -1,3 +1,4 @@
+const middleware = require("../utils/middleware");
 const blogsRouter = require("express").Router();
 const mongoose = require("mongoose");
 const Blog = require("../models/blog");
@@ -15,7 +16,7 @@ blogsRouter.get("/", async (request, response) => {
 });
 
 // Add a new blog
-blogsRouter.post("/", async (request, response) => {
+blogsRouter.post("/", middleware.userExtractor, async (request, response) => {
   let blog = request.body;
   const user = request.user;
 
@@ -68,28 +69,34 @@ blogsRouter.put("/:id", async (request, response) => {
 });
 
 // Delete a blog by id
-blogsRouter.delete("/:id", async (request, response) => {
-  // Get data from the request
-  const blogId = request.params.id;
-  const user = request.user;
+blogsRouter.delete(
+  "/:id",
+  middleware.userExtractor,
+  async (request, response) => {
+    // Get data from the request
+    const blogId = request.params.id;
+    const user = request.user;
 
-  if (!mongoose.Types.ObjectId.isValid(blogId)) {
-    return response.status(400).json({ error: "Bad request: invalid id" });
+    if (!mongoose.Types.ObjectId.isValid(blogId)) {
+      return response.status(400).json({ error: "Bad request: invalid id" });
+    }
+
+    // Find the blog
+    const blog = await Blog.findById(blogId);
+
+    console.log(blog.user.toString(), user.id.toString());
+
+    if (blog.user.toString() !== user.id.toString()) {
+      return response.status(401).json({
+        error: "Unauthorized: cannot delete a blog that is not yours.",
+      });
+    }
+
+    const result = await blog.deleteOne();
+
+    // Return response
+    return response.status(204).end();
   }
-
-  // Find the blog
-  const blog = await Blog.findById(blogId);
-
-  if (blog.user.toString() !== user.id.toString()) {
-    return response
-      .status(401)
-      .json({ error: "Unauthorized: cannot delete a blog that is not yours." });
-  }
-
-  const result = await blog.deleteOne();
-
-  // Return response
-  return response.status(204).end();
-});
+);
 
 module.exports = blogsRouter;

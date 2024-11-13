@@ -21,7 +21,7 @@ app.use(express.json());
 // Routes
 app.use("/api/login", loginRouter);
 app.use("/api/users", usersRouter);
-app.use("/api/blogs", middleware.userExtractor, blogsRouter);
+app.use("/api/blogs", blogsRouter);
 
 // Middleware 2
 app.use(middleware.unknownEndpoint);
