@@ -47,6 +47,8 @@ blogsRouter.post("/", middleware.userExtractor, async (request, response) => {
 
 // Update a blog post by id
 blogsRouter.put("/:id", async (request, response) => {
+  console.log(request.body);
+
   // Get data from the request
   const blogId = request.params.id;
   const body = request.body;
@@ -55,10 +57,17 @@ blogsRouter.put("/:id", async (request, response) => {
     author: body.author,
     url: body.url,
     likes: body.likes,
+    user: body.user.id,
   };
 
   // Process data
-  const updatedBlog = await Blog.findByIdAndUpdate(blogId, blog, { new: true });
+  const updatedBlog = await Blog.findByIdAndUpdate(blogId, blog, {
+    new: true,
+  }).populate("user", {
+    username: 1,
+    name: 1,
+    id: 1,
+  });
 
   if (!updatedBlog) {
     return response.status(404).json({ error: "Not found: Object not found." });
