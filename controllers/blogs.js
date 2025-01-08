@@ -42,13 +42,20 @@ blogsRouter.post("/", middleware.userExtractor, async (request, response) => {
 
   savedUser = await user.save();
 
-  return response.status(201).json(savedBlog);
+  const savedBlogPopulated = await Blog.findById(savedBlog.id).populate(
+    "user",
+    {
+      username: 1,
+      name: 1,
+      id: 1,
+    }
+  );
+
+  return response.status(201).json(savedBlogPopulated);
 });
 
 // Update a blog post by id
 blogsRouter.put("/:id", async (request, response) => {
-  console.log(request.body);
-
   // Get data from the request
   const blogId = request.params.id;
   const body = request.body;
@@ -92,8 +99,6 @@ blogsRouter.delete(
 
     // Find the blog
     const blog = await Blog.findById(blogId);
-
-    console.log(blog.user.toString(), user.id.toString());
 
     if (blog.user.toString() !== user.id.toString()) {
       return response.status(401).json({
