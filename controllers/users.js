@@ -14,6 +14,17 @@ usersRouter.get("/", async (request, response) => {
   return response.json(users);
 });
 
+// Get user by id
+usersRouter.get("/:id", async (request, response) => {
+  const user = await User.findById(request.params.id).populate("blogs", {
+    url: 1,
+    title: 1,
+    author: 1,
+    id: 1,
+  });
+  return response.json(user);
+});
+
 // Add a new user
 usersRouter.post("/", async (request, response) => {
   const { username, password, name } = request.body;

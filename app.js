@@ -18,6 +18,11 @@ app.use(middleware.tokenExtractor);
 app.use(cors());
 app.use(express.json());
 
+// Import all models --> this is registering the models
+require("./models/blog"); // This registers the Blog model
+require("./models/comment"); // This registers the Comment model
+require("./models/user");
+
 // Routes
 app.use("/api/login", loginRouter);
 app.use("/api/users", usersRouter);

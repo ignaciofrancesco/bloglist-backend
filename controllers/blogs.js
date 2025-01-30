@@ -2,16 +2,20 @@ const middleware = require("../utils/middleware");
 const blogsRouter = require("express").Router();
 const mongoose = require("mongoose");
 const Blog = require("../models/blog");
-const User = require("../models/user");
-const jwt = require("jsonwebtoken");
+const Comment = require("../models/comment");
 
 // Get all blogs
 blogsRouter.get("/", async (request, response) => {
-  const blogs = await Blog.find({}).populate("user", {
-    username: 1,
-    name: 1,
-    id: 1,
-  });
+  const blogs = await Blog.find({})
+    .populate("user", {
+      username: 1,
+      name: 1,
+      id: 1,
+    })
+    .populate("comments", {
+      content: 1,
+      id: 1,
+    });
   return response.json(blogs);
 });
 
@@ -42,14 +46,13 @@ blogsRouter.post("/", middleware.userExtractor, async (request, response) => {
 
   savedUser = await user.save();
 
-  const savedBlogPopulated = await Blog.findById(savedBlog.id).populate(
-    "user",
-    {
+  const savedBlogPopulated = await Blog.findById(savedBlog.id)
+    .populate("user", {
       username: 1,
       name: 1,
       id: 1,
-    }
-  );
+    })
+    .populate("comments", { content: 1, id: 1 });
 
   return response.status(201).json(savedBlogPopulated);
 });
@@ -70,11 +73,13 @@ blogsRouter.put("/:id", async (request, response) => {
   // Process data
   const updatedBlog = await Blog.findByIdAndUpdate(blogId, blog, {
     new: true,
-  }).populate("user", {
-    username: 1,
-    name: 1,
-    id: 1,
-  });
+  })
+    .populate("user", {
+      username: 1,
+      name: 1,
+      id: 1,
+    })
+    .populate("comments", { content: 1, id: 1 });
 
   if (!updatedBlog) {
     return response.status(404).json({ error: "Not found: Object not found." });
@@ -112,5 +117,39 @@ blogsRouter.delete(
     return response.status(204).end();
   }
 );
+
+// Post a comment
+blogsRouter.post("/:id/comments", async (request, response) => {
+  // Get data from the request
+  const blogId = request.params.id;
+  const body = request.body;
+
+  // Validate that has content
+  if (!body.content) {
+    return response.status(400).end();
+  }
+
+  // Create and save new comment
+  const newComment = {
+    content: body.content,
+    blog: blogId,
+  };
+  const commentMongoose = new Comment(newComment);
+  savedComment = await commentMongoose.save();
+
+  // Get the correspondent blog
+  const blog = await Blog.findById(blogId);
+  blog.comments.push(savedComment.id);
+
+  const updatedBlog = await Blog.findByIdAndUpdate(blog.id, blog, {
+    new: true,
+  }).populate("comments", {
+    content: 1,
+    id: 1,
+  });
+
+  // Send response
+  return response.status(201).json(updatedBlog);
+});
 
 module.exports = blogsRouter;
